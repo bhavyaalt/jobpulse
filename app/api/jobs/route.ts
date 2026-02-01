@@ -131,7 +131,7 @@ async function fetchJobicy(): Promise<Job[]> {
       source: 'Jobicy',
       posted: job.pubDate,
       tags: job.jobIndustry ? [job.jobIndustry] : [],
-      category: job.jobIndustry?.toLowerCase() || 'general',
+      category: typeof job.jobIndustry === 'string' ? job.jobIndustry.toLowerCase() : 'general',
     }));
   } catch (e) {
     console.error('Jobicy error:', e);
