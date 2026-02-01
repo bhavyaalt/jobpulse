@@ -172,3 +172,58 @@ body {
   color: #888;
   font-size: 0.9rem;
 }
+
+.subtitle {
+  color: #667eea;
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+}
+
+.toggle-row {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  color: #aaa;
+  font-size: 0.9rem;
+}
+
+.toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: #667eea;
+}
+
+.no-results {
+  text-align: center;
+  padding: 3rem;
+  color: #888;
+}
+
+.no-results p {
+  margin-bottom: 0.5rem;
+}
+
+.footer {
+  text-align: center;
+  margin-top: 3rem;
+  padding-top: 2rem;
+  border-top: 1px solid #333;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.footer a {
+  color: #667eea;
+  text-decoration: none;
+}
+
+.footer a:hover {
+  text-decoration: underline;
+}

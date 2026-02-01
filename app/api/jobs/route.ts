@@ -11,18 +11,66 @@ interface Job {
   source: string;
   posted?: string;
   tags?: string[];
+  level?: string;
+}
+
+// Data-related keywords for filtering
+const DATA_KEYWORDS = [
+  'data', 'analyst', 'analytics', 'scientist', 'science', 'engineer',
+  'sql', 'python', 'tableau', 'power bi', 'excel', 'statistics',
+  'machine learning', 'ml', 'ai', 'database', 'etl', 'bi ',
+  'business intelligence', 'visualization', 'reporting', 'insights'
+];
+
+// Entry level indicators
+const ENTRY_LEVEL_KEYWORDS = [
+  'junior', 'entry', 'associate', 'graduate', 'intern', 'trainee',
+  'early career', 'new grad', 'fresher', 'level 1', 'l1', 'i ', 'i,',
+  '0-2 years', '1-2 years', '0-1 year', 'no experience'
+];
+
+// Senior indicators to exclude
+const SENIOR_KEYWORDS = [
+  'senior', 'sr.', 'sr ', 'lead', 'principal', 'staff', 'manager',
+  'director', 'head of', 'vp', 'chief', '5+ years', '7+ years', '10+ years'
+];
+
+function isDataRole(job: { title: string; tags?: string[] }): boolean {
+  const titleLower = job.title.toLowerCase();
+  const tagsLower = job.tags?.map(t => t.toLowerCase()).join(' ') || '';
+  const combined = `${titleLower} ${tagsLower}`;
+  
+  return DATA_KEYWORDS.some(keyword => combined.includes(keyword));
+}
+
+function isEntryLevel(job: { title: string; type?: string }): boolean {
+  const titleLower = job.title.toLowerCase();
+  const typeLower = job.type?.toLowerCase() || '';
+  const combined = `${titleLower} ${typeLower}`;
+  
+  // Exclude senior roles
+  if (SENIOR_KEYWORDS.some(keyword => combined.includes(keyword))) {
+    return false;
+  }
+  
+  // Include if explicitly entry level, or if no level specified (could be entry)
+  const isExplicitlyEntry = ENTRY_LEVEL_KEYWORDS.some(keyword => combined.includes(keyword));
+  const hasNoLevelIndicator = !SENIOR_KEYWORDS.some(keyword => combined.includes(keyword)) &&
+                               !combined.includes('mid') && !combined.includes('intermediate');
+  
+  return isExplicitlyEntry || hasNoLevelIndicator;
 }
 
 // RemoteOK - Free public API
 async function fetchRemoteOK(): Promise<Job[]> {
   try {
-    const res = await fetch('https://remoteok.com/api', {
+    const res = await fetch('https://remoteok.com/api?tag=data', {
       headers: { 'User-Agent': 'JobPulse/1.0' },
       next: { revalidate: 300 }
     });
     const data = await res.json();
     
-    return data.slice(1, 51).map((job: any) => ({
+    return data.slice(1, 100).map((job: any) => ({
       id: `remoteok-${job.id}`,
       title: job.position || 'Unknown',
       company: job.company || 'Unknown',
@@ -39,10 +87,10 @@ async function fetchRemoteOK(): Promise<Job[]> {
   }
 }
 
-// Remotive - Free API
+// Remotive - Free API with category filter
 async function fetchRemotive(): Promise<Job[]> {
   try {
-    const res = await fetch('https://remotive.com/api/remote-jobs?limit=50', {
+    const res = await fetch('https://remotive.com/api/remote-jobs?category=data&limit=100', {
       next: { revalidate: 300 }
     });
     const data = await res.json();
@@ -73,7 +121,7 @@ async function fetchArbeitnow(): Promise<Job[]> {
     });
     const data = await res.json();
     
-    return data.data.slice(0, 50).map((job: any) => ({
+    return data.data.slice(0, 100).map((job: any) => ({
       id: `arbeitnow-${job.slug}`,
       title: job.title,
       company: job.company_name,
@@ -93,7 +141,7 @@ async function fetchArbeitnow(): Promise<Job[]> {
 // Jobicy - Free API for remote jobs
 async function fetchJobicy(): Promise<Job[]> {
   try {
-    const res = await fetch('https://jobicy.com/api/v2/remote-jobs?count=50', {
+    const res = await fetch('https://jobicy.com/api/v2/remote-jobs?count=100&industry=data-science', {
       next: { revalidate: 300 }
     });
     const data = await res.json();
@@ -125,6 +173,7 @@ export async function GET(request: Request) {
   const query = searchParams.get('q')?.toLowerCase() || '';
   const location = searchParams.get('location')?.toLowerCase() || '';
   const source = searchParams.get('source') || '';
+  const entryOnly = searchParams.get('entry') !== 'false'; // Default: entry level only
 
   // Fetch from all sources in parallel
   const [remoteok, remotive, arbeitnow, jobicy] = await Promise.all([
@@ -136,7 +185,15 @@ export async function GET(request: Request) {
 
   let allJobs = [...remoteok, ...remotive, ...arbeitnow, ...jobicy];
 
-  // Apply filters
+  // Filter for data roles
+  allJobs = allJobs.filter(job => isDataRole(job));
+
+  // Filter for entry level (exclude senior roles)
+  if (entryOnly) {
+    allJobs = allJobs.filter(job => isEntryLevel(job));
+  }
+
+  // Apply additional filters
   if (query) {
     allJobs = allJobs.filter(job => 
       job.title.toLowerCase().includes(query) ||
@@ -155,9 +212,11 @@ export async function GET(request: Request) {
     allJobs = allJobs.filter(job => job.source === source);
   }
 
-  // Sort by recency (newest first based on source order)
-  // Shuffle slightly to mix sources
-  allJobs.sort(() => Math.random() - 0.5);
+  // Sort by recency
+  allJobs.sort((a, b) => {
+    if (!a.posted || !b.posted) return 0;
+    return new Date(b.posted).getTime() - new Date(a.posted).getTime();
+  });
 
   return NextResponse.json({
     jobs: allJobs,

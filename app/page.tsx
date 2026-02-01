@@ -32,6 +32,7 @@ export default function Home() {
   const [query, setQuery] = useState('');
   const [location, setLocation] = useState('');
   const [source, setSource] = useState('');
+  const [entryOnly, setEntryOnly] = useState(true);
   const [sources, setSources] = useState<JobsResponse['sources'] | null>(null);
 
   const fetchJobs = async () => {
@@ -41,6 +42,7 @@ export default function Home() {
       if (query) params.set('q', query);
       if (location) params.set('location', location);
       if (source) params.set('source', source);
+      if (!entryOnly) params.set('entry', 'false');
       
       const res = await fetch(`/api/jobs?${params}`);
       const data: JobsResponse = await res.json();
@@ -54,7 +56,7 @@ export default function Home() {
 
   useEffect(() => {
     fetchJobs();
-  }, []);
+  }, [entryOnly]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,15 +79,16 @@ export default function Home() {
   return (
     <div className="container">
       <header className="header">
-        <h1>⚡ JobPulse</h1>
-        <p>Aggregating remote jobs from multiple sources</p>
+        <h1>📊 DataJobs</h1>
+        <p>Entry-level data roles • Remote-first • Updated daily</p>
+        <div className="subtitle">Data Analyst • Data Scientist • Analytics • BI • SQL</div>
       </header>
 
       {sources && (
         <div className="stats">
           <div className="stat">
             <div className="stat-number">{jobs.length}</div>
-            <div className="stat-label">Jobs Found</div>
+            <div className="stat-label">Data Jobs</div>
           </div>
           <div className="stat">
             <div className="stat-number">4</div>
@@ -97,13 +100,13 @@ export default function Home() {
       <form className="filters" onSubmit={handleSearch}>
         <input
           type="text"
-          placeholder="Search jobs (e.g. React, Python, Designer)"
+          placeholder="Search (e.g. SQL, Python, Tableau)"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
         <input
           type="text"
-          placeholder="Location (e.g. Remote, USA, Europe)"
+          placeholder="Location (e.g. USA, Europe)"
           value={location}
           onChange={(e) => setLocation(e.target.value)}
         />
@@ -117,8 +120,19 @@ export default function Home() {
         <button type="submit">Search</button>
       </form>
 
+      <div className="toggle-row">
+        <label className="toggle">
+          <input
+            type="checkbox"
+            checked={entryOnly}
+            onChange={(e) => setEntryOnly(e.target.checked)}
+          />
+          <span>Entry Level Only (exclude Senior/Lead roles)</span>
+        </label>
+      </div>
+
       {loading ? (
-        <div className="loading">Loading jobs from all sources...</div>
+        <div className="loading">Finding entry-level data jobs...</div>
       ) : (
         <div className="jobs-grid">
           {jobs.map((job) => (
@@ -148,8 +162,15 @@ export default function Home() {
       )}
 
       {!loading && jobs.length === 0 && (
-        <div className="loading">No jobs found. Try different filters.</div>
+        <div className="no-results">
+          <p>No entry-level data jobs found with those filters.</p>
+          <p>Try removing filters or uncheck "Entry Level Only".</p>
+        </div>
       )}
+
+      <footer className="footer">
+        <p>Built with ⚡ by <a href="https://shippedbyai.com" target="_blank">shippedbyai.com</a></p>
+      </footer>
     </div>
   );
 }
