@@ -125,14 +125,19 @@ body {
   color: #aaa;
 }
 
-.job-card .source {
+.card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1rem;
+}
+
+.card-footer .source {
   font-size: 0.8rem;
   color: #666;
 }
 
-.job-card a {
-  display: inline-block;
-  margin-top: 1rem;
+.card-footer a {
   padding: 0.5rem 1rem;
   background: #333;
   color: #fff;
@@ -141,8 +146,15 @@ body {
   font-size: 0.9rem;
 }
 
-.job-card a:hover {
+.card-footer a:hover {
   background: #444;
+}
+
+.more-info {
+  text-align: center;
+  padding: 1rem;
+  color: #666;
+  font-size: 0.9rem;
 }
 
 .loading {
@@ -182,7 +194,9 @@ body {
 .toggle-row {
   display: flex;
   justify-content: center;
+  gap: 2rem;
   margin-bottom: 1.5rem;
+  flex-wrap: wrap;
 }
 
 .toggle {
