@@ -11,20 +11,21 @@ interface Job {
   source: string;
   posted?: string;
   tags?: string[];
-  category?: string;
 }
 
-// RemoteOK - Free public API (fetch more, filter client-side)
+// RemoteOK - Free public API
 async function fetchRemoteOK(): Promise<Job[]> {
   try {
     const res = await fetch('https://remoteok.com/api', {
       headers: { 'User-Agent': 'DataJobs/1.0' },
-      next: { revalidate: 300 }
+      next: { revalidate: 600 }
     });
+    if (!res.ok) return [];
     const data = await res.json();
+    if (!Array.isArray(data)) return [];
     
     return data.slice(1, 150).map((job: any) => ({
-      id: `remoteok-${job.id}`,
+      id: `remoteok-${job.id || Math.random()}`,
       title: job.position || 'Unknown',
       company: job.company || 'Unknown',
       location: job.location || 'Remote',
@@ -32,8 +33,7 @@ async function fetchRemoteOK(): Promise<Job[]> {
       url: job.url || `https://remoteok.com/l/${job.id}`,
       source: 'RemoteOK',
       posted: job.date,
-      tags: job.tags || [],
-      category: 'general',
+      tags: Array.isArray(job.tags) ? job.tags : [],
     }));
   } catch (e) {
     console.error('RemoteOK error:', e);
@@ -41,41 +41,28 @@ async function fetchRemoteOK(): Promise<Job[]> {
   }
 }
 
-// Remotive - Free API (multiple categories)
+// Remotive - Free API
 async function fetchRemotive(): Promise<Job[]> {
   try {
-    // Fetch multiple categories
-    const categories = ['data', 'software-dev', 'all-others'];
-    const promises = categories.map(cat => 
-      fetch(`https://remotive.com/api/remote-jobs?category=${cat}&limit=50`, {
-        next: { revalidate: 300 }
-      }).then(r => r.json()).catch(() => ({ jobs: [] }))
-    );
-    
-    const results = await Promise.all(promises);
-    const allJobs: Job[] = [];
-    
-    results.forEach((data, i) => {
-      if (data.jobs) {
-        data.jobs.forEach((job: any) => {
-          allJobs.push({
-            id: `remotive-${job.id}`,
-            title: job.title,
-            company: job.company_name,
-            location: job.candidate_required_location || 'Remote',
-            type: job.job_type,
-            salary: job.salary || undefined,
-            url: job.url,
-            source: 'Remotive',
-            posted: job.publication_date,
-            tags: job.tags || [],
-            category: categories[i],
-          });
-        });
-      }
+    const res = await fetch('https://remotive.com/api/remote-jobs?limit=100', {
+      next: { revalidate: 600 }
     });
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (!data.jobs || !Array.isArray(data.jobs)) return [];
     
-    return allJobs;
+    return data.jobs.map((job: any) => ({
+      id: `remotive-${job.id || Math.random()}`,
+      title: job.title || 'Unknown',
+      company: job.company_name || 'Unknown',
+      location: job.candidate_required_location || 'Remote',
+      type: job.job_type,
+      salary: job.salary || undefined,
+      url: job.url,
+      source: 'Remotive',
+      posted: job.publication_date,
+      tags: Array.isArray(job.tags) ? job.tags : [],
+    }));
   } catch (e) {
     console.error('Remotive error:', e);
     return [];
@@ -86,21 +73,22 @@ async function fetchRemotive(): Promise<Job[]> {
 async function fetchArbeitnow(): Promise<Job[]> {
   try {
     const res = await fetch('https://www.arbeitnow.com/api/job-board-api', {
-      next: { revalidate: 300 }
+      next: { revalidate: 600 }
     });
+    if (!res.ok) return [];
     const data = await res.json();
+    if (!data.data || !Array.isArray(data.data)) return [];
     
     return data.data.slice(0, 100).map((job: any) => ({
-      id: `arbeitnow-${job.slug}`,
-      title: job.title,
-      company: job.company_name,
+      id: `arbeitnow-${job.slug || Math.random()}`,
+      title: job.title || 'Unknown',
+      company: job.company_name || 'Unknown',
       location: job.location || 'Remote',
       type: job.remote ? 'Remote' : 'On-site',
       url: job.url,
       source: 'Arbeitnow',
       posted: job.created_at,
-      tags: job.tags || [],
-      category: 'general',
+      tags: Array.isArray(job.tags) ? job.tags : [],
     }));
   } catch (e) {
     console.error('Arbeitnow error:', e);
@@ -112,16 +100,16 @@ async function fetchArbeitnow(): Promise<Job[]> {
 async function fetchJobicy(): Promise<Job[]> {
   try {
     const res = await fetch('https://jobicy.com/api/v2/remote-jobs?count=100', {
-      next: { revalidate: 300 }
+      next: { revalidate: 600 }
     });
+    if (!res.ok) return [];
     const data = await res.json();
-    
-    if (!data.jobs) return [];
+    if (!data.jobs || !Array.isArray(data.jobs)) return [];
     
     return data.jobs.map((job: any) => ({
-      id: `jobicy-${job.id}`,
-      title: job.jobTitle,
-      company: job.companyName,
+      id: `jobicy-${job.id || Math.random()}`,
+      title: job.jobTitle || 'Unknown',
+      company: job.companyName || 'Unknown',
       location: job.jobGeo || 'Remote',
       type: job.jobType,
       salary: job.annualSalaryMin && job.annualSalaryMax 
@@ -130,8 +118,7 @@ async function fetchJobicy(): Promise<Job[]> {
       url: job.url,
       source: 'Jobicy',
       posted: job.pubDate,
-      tags: job.jobIndustry ? [job.jobIndustry] : [],
-      category: typeof job.jobIndustry === 'string' ? job.jobIndustry.toLowerCase() : 'general',
+      tags: typeof job.jobIndustry === 'string' ? [job.jobIndustry] : [],
     }));
   } catch (e) {
     console.error('Jobicy error:', e);
@@ -140,30 +127,50 @@ async function fetchJobicy(): Promise<Job[]> {
 }
 
 export async function GET() {
-  // Fetch from all sources in parallel - NO FILTERING, send everything
-  const [remoteok, remotive, arbeitnow, jobicy] = await Promise.all([
-    fetchRemoteOK(),
-    fetchRemotive(),
-    fetchArbeitnow(),
-    fetchJobicy(),
-  ]);
+  try {
+    // Fetch from all sources in parallel with timeout
+    const results = await Promise.allSettled([
+      fetchRemoteOK(),
+      fetchRemotive(),
+      fetchArbeitnow(),
+      fetchJobicy(),
+    ]);
 
-  const allJobs = [...remoteok, ...remotive, ...arbeitnow, ...jobicy];
+    const allJobs: Job[] = [];
+    const sources: Record<string, number> = {
+      remoteok: 0,
+      remotive: 0,
+      arbeitnow: 0,
+      jobicy: 0,
+    };
 
-  // Sort by recency
-  allJobs.sort((a, b) => {
-    if (!a.posted || !b.posted) return 0;
-    return new Date(b.posted).getTime() - new Date(a.posted).getTime();
-  });
+    results.forEach((result, i) => {
+      if (result.status === 'fulfilled') {
+        const jobs = result.value;
+        allJobs.push(...jobs);
+        const sourceNames = ['remoteok', 'remotive', 'arbeitnow', 'jobicy'];
+        sources[sourceNames[i]] = jobs.length;
+      }
+    });
 
-  return NextResponse.json({
-    jobs: allJobs,
-    total: allJobs.length,
-    sources: {
-      remoteok: remoteok.length,
-      remotive: remotive.length,
-      arbeitnow: arbeitnow.length,
-      jobicy: jobicy.length,
-    }
-  });
+    // Sort by recency
+    allJobs.sort((a, b) => {
+      if (!a.posted || !b.posted) return 0;
+      return new Date(b.posted).getTime() - new Date(a.posted).getTime();
+    });
+
+    return NextResponse.json({
+      jobs: allJobs,
+      total: allJobs.length,
+      sources,
+    });
+  } catch (e) {
+    console.error('API error:', e);
+    return NextResponse.json({
+      jobs: [],
+      total: 0,
+      sources: { remoteok: 0, remotive: 0, arbeitnow: 0, jobicy: 0 },
+      error: 'Failed to fetch jobs'
+    });
+  }
 }
