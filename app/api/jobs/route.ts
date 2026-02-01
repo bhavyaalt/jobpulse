@@ -99,7 +99,7 @@ async function fetchArbeitnow(): Promise<Job[]> {
 // Jobicy - Free API
 async function fetchJobicy(): Promise<Job[]> {
   try {
-    const res = await fetch('https://jobicy.com/api/v2/remote-jobs?count=100', {
+    const res = await fetch('https://jobicy.com/api/v2/remote-jobs?count=100&geo=usa', {
       next: { revalidate: 600 }
     });
     if (!res.ok) return [];
@@ -110,7 +110,7 @@ async function fetchJobicy(): Promise<Job[]> {
       id: `jobicy-${job.id || Math.random()}`,
       title: job.jobTitle || 'Unknown',
       company: job.companyName || 'Unknown',
-      location: job.jobGeo || 'Remote',
+      location: job.jobGeo || 'Remote USA',
       type: job.jobType,
       salary: job.annualSalaryMin && job.annualSalaryMax 
         ? `$${job.annualSalaryMin}-${job.annualSalaryMax}` 
@@ -126,30 +126,112 @@ async function fetchJobicy(): Promise<Job[]> {
   }
 }
 
+// The Muse - Free API (great for entry level!)
+async function fetchTheMuse(): Promise<Job[]> {
+  try {
+    const res = await fetch('https://www.themuse.com/api/public/jobs?page=1&descending=true&location=United%20States&level=Entry%20Level&level=Internship', {
+      next: { revalidate: 600 }
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (!data.results || !Array.isArray(data.results)) return [];
+    
+    return data.results.slice(0, 100).map((job: any) => ({
+      id: `muse-${job.id || Math.random()}`,
+      title: job.name || 'Unknown',
+      company: job.company?.name || 'Unknown',
+      location: job.locations?.map((l: any) => l.name).join(', ') || 'USA',
+      type: job.levels?.map((l: any) => l.name).join(', '),
+      url: `https://www.themuse.com/jobs/${job.company?.short_name}/${job.short_name}`,
+      source: 'TheMuse',
+      posted: job.publication_date,
+      tags: job.categories?.map((c: any) => c.name) || [],
+    }));
+  } catch (e) {
+    console.error('TheMuse error:', e);
+    return [];
+  }
+}
+
+// FindWork - Free API
+async function fetchFindWork(): Promise<Job[]> {
+  try {
+    const res = await fetch('https://findwork.dev/api/jobs/?location=usa&order_by=-date_posted', {
+      next: { revalidate: 600 }
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (!data.results || !Array.isArray(data.results)) return [];
+    
+    return data.results.slice(0, 50).map((job: any) => ({
+      id: `findwork-${job.id || Math.random()}`,
+      title: job.role || 'Unknown',
+      company: job.company_name || 'Unknown',
+      location: job.location || 'USA Remote',
+      type: job.remote ? 'Remote' : 'On-site',
+      url: job.url,
+      source: 'FindWork',
+      posted: job.date_posted,
+      tags: Array.isArray(job.keywords) ? job.keywords : [],
+    }));
+  } catch (e) {
+    console.error('FindWork error:', e);
+    return [];
+  }
+}
+
+// Himalayas - Free remote jobs API
+async function fetchHimalayas(): Promise<Job[]> {
+  try {
+    const res = await fetch('https://himalayas.app/jobs/api?limit=100', {
+      next: { revalidate: 600 }
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (!data.jobs || !Array.isArray(data.jobs)) return [];
+    
+    return data.jobs.map((job: any) => ({
+      id: `himalayas-${job.id || Math.random()}`,
+      title: job.title || 'Unknown',
+      company: job.companyName || 'Unknown',
+      location: job.locationRestrictions?.join(', ') || 'Remote Worldwide',
+      type: 'Remote',
+      salary: job.minSalary && job.maxSalary ? `$${job.minSalary}-${job.maxSalary}` : undefined,
+      url: job.applicationLink || `https://himalayas.app/jobs/${job.id}`,
+      source: 'Himalayas',
+      posted: job.pubDate,
+      tags: job.categories || [],
+    }));
+  } catch (e) {
+    console.error('Himalayas error:', e);
+    return [];
+  }
+}
+
 export async function GET() {
   try {
-    // Fetch from all sources in parallel with timeout
+    // Fetch from all sources in parallel
     const results = await Promise.allSettled([
       fetchRemoteOK(),
       fetchRemotive(),
       fetchArbeitnow(),
       fetchJobicy(),
+      fetchTheMuse(),
+      fetchFindWork(),
+      fetchHimalayas(),
     ]);
 
+    const sourceNames = ['RemoteOK', 'Remotive', 'Arbeitnow', 'Jobicy', 'TheMuse', 'FindWork', 'Himalayas'];
     const allJobs: Job[] = [];
-    const sources: Record<string, number> = {
-      remoteok: 0,
-      remotive: 0,
-      arbeitnow: 0,
-      jobicy: 0,
-    };
+    const sources: Record<string, number> = {};
 
     results.forEach((result, i) => {
       if (result.status === 'fulfilled') {
         const jobs = result.value;
         allJobs.push(...jobs);
-        const sourceNames = ['remoteok', 'remotive', 'arbeitnow', 'jobicy'];
         sources[sourceNames[i]] = jobs.length;
+      } else {
+        sources[sourceNames[i]] = 0;
       }
     });
 
@@ -169,7 +251,7 @@ export async function GET() {
     return NextResponse.json({
       jobs: [],
       total: 0,
-      sources: { remoteok: 0, remotive: 0, arbeitnow: 0, jobicy: 0 },
+      sources: {},
       error: 'Failed to fetch jobs'
     });
   }

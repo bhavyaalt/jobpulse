@@ -36,15 +36,25 @@ const SENIOR_KEYWORDS = [
   'director', 'head of', 'vp', 'chief', 'architect'
 ];
 
+// US location keywords
+const US_KEYWORDS = [
+  'usa', 'united states', 'us ', ' us', 'u.s.', 'america',
+  'new york', 'california', 'texas', 'florida', 'remote us',
+  'chicago', 'los angeles', 'san francisco', 'seattle', 'boston',
+  'denver', 'austin', 'atlanta', 'miami', 'dallas', 'phoenix',
+  'anywhere', 'worldwide', 'north america'
+];
+
 export default function Home() {
   const [allJobs, setAllJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
-  const [location, setLocation] = useState('');
   const [source, setSource] = useState('');
   const [dataOnly, setDataOnly] = useState(true);
   const [entryOnly, setEntryOnly] = useState(true);
+  const [usOnly, setUsOnly] = useState(true);
   const [totalFetched, setTotalFetched] = useState(0);
+  const [availableSources, setAvailableSources] = useState<string[]>([]);
 
   // Fetch ALL jobs once on mount
   useEffect(() => {
@@ -55,6 +65,7 @@ export default function Home() {
         const data: JobsResponse = await res.json();
         setAllJobs(data.jobs);
         setTotalFetched(data.total);
+        setAvailableSources(Object.keys(data.sources).filter(s => data.sources[s] > 0));
       } catch (e) {
         console.error('Failed to fetch jobs:', e);
       }
@@ -63,9 +74,17 @@ export default function Home() {
     fetchJobs();
   }, []);
 
-  // Filter jobs client-side (instant, no API calls)
+  // Filter jobs client-side (instant)
   const filteredJobs = useMemo(() => {
     let jobs = [...allJobs];
+
+    // US jobs filter
+    if (usOnly) {
+      jobs = jobs.filter(job => {
+        const loc = job.location.toLowerCase();
+        return US_KEYWORDS.some(kw => loc.includes(kw)) || loc === 'remote';
+      });
+    }
 
     // Data roles filter
     if (dataOnly) {
@@ -93,21 +112,13 @@ export default function Home() {
       );
     }
 
-    // Location filter
-    if (location.trim()) {
-      const loc = location.toLowerCase();
-      jobs = jobs.filter(job =>
-        job.location.toLowerCase().includes(loc)
-      );
-    }
-
     // Source filter
     if (source) {
       jobs = jobs.filter(job => job.source === source);
     }
 
     return jobs;
-  }, [allJobs, query, location, source, dataOnly, entryOnly]);
+  }, [allJobs, query, source, dataOnly, entryOnly, usOnly]);
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return '';
@@ -125,8 +136,8 @@ export default function Home() {
   return (
     <div className="container">
       <header className="header">
-        <h1>📊 DataJobs</h1>
-        <p>Entry-level data roles • Remote-first • Updated daily</p>
+        <h1>📊 DataJobs US</h1>
+        <p>Entry-level data roles • US & Remote • 7 Sources</p>
       </header>
 
       <div className="stats">
@@ -138,6 +149,10 @@ export default function Home() {
           <div className="stat-number">{totalFetched}</div>
           <div className="stat-label">Total Jobs</div>
         </div>
+        <div className="stat">
+          <div className="stat-number">{availableSources.length}</div>
+          <div className="stat-label">Sources</div>
+        </div>
       </div>
 
       <div className="filters">
@@ -147,18 +162,11 @@ export default function Home() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-        <input
-          type="text"
-          placeholder="Location (USA, Europe...)"
-          value={location}
-          onChange={(e) => setLocation(e.target.value)}
-        />
         <select value={source} onChange={(e) => setSource(e.target.value)}>
           <option value="">All Sources</option>
-          <option value="RemoteOK">RemoteOK</option>
-          <option value="Remotive">Remotive</option>
-          <option value="Arbeitnow">Arbeitnow</option>
-          <option value="Jobicy">Jobicy</option>
+          {availableSources.map(s => (
+            <option key={s} value={s}>{s}</option>
+          ))}
         </select>
       </div>
 
@@ -166,10 +174,18 @@ export default function Home() {
         <label className="toggle">
           <input
             type="checkbox"
+            checked={usOnly}
+            onChange={(e) => setUsOnly(e.target.checked)}
+          />
+          <span>🇺🇸 US Only</span>
+        </label>
+        <label className="toggle">
+          <input
+            type="checkbox"
             checked={dataOnly}
             onChange={(e) => setDataOnly(e.target.checked)}
           />
-          <span>Data roles only</span>
+          <span>📊 Data roles</span>
         </label>
         <label className="toggle">
           <input
@@ -177,12 +193,12 @@ export default function Home() {
             checked={entryOnly}
             onChange={(e) => setEntryOnly(e.target.checked)}
           />
-          <span>Entry level (no Senior/Lead)</span>
+          <span>🎓 Entry level</span>
         </label>
       </div>
 
       {loading ? (
-        <div className="loading">Loading jobs from 4 sources...</div>
+        <div className="loading">Loading jobs from 7 sources...</div>
       ) : (
         <div className="jobs-grid">
           {filteredJobs.slice(0, 100).map((job) => (
@@ -215,7 +231,7 @@ export default function Home() {
       {!loading && filteredJobs.length === 0 && (
         <div className="no-results">
           <p>No jobs match your filters.</p>
-          <p>Try unchecking "Data roles only" or "Entry level"</p>
+          <p>Try unchecking some filters above</p>
         </div>
       )}
 
