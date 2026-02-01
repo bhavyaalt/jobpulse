@@ -1,1 +1,2 @@
-node_modules\n.next\n.vercel
+node_modules/
+.next/
